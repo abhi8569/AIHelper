@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directory Selector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        #pathInput {
+            width: 70%;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #directoryList {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 20px;
+            min-height: 100px;
+        }
+        .directory-item {
+            margin: 5px 0;
+        }
+        .directory-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        #selectedCount {
+            margin-top: 10px;
+            color: #666;
+        }
+        .update-btn {
+            background-color: #007bff;
+            margin-left: 10px;
+            display: none;
+        }
+        .update-btn:hover {
+            background-color: #0056b3;
+        }
+        .status-message {
+            margin-top: 5px;
+            font-size: 0.9em;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        #updateAllBtn {
+            margin-top: 10px;
+            background-color: #007bff;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Directory Selector</h1>
+    
+    <div class="input-group">
+        <input type="text" id="pathInput" placeholder="Enter directory path (e.g., C:/Users)">
+        <button onclick="listDirectories()">List Directories</button>
+    </div>
+
+    <div id="directoryList"></div>
+    <div id="selectedCount"></div>
+    <button id="updateAllBtn" onclick="updateSelectedDirectories()">Update Selected</button>
+
+    <script>
+        let basePath = '';
+        async function listDirectories() {
+            const pathInput = document.getElementById('pathInput');
+            const directoryList = document.getElementById('directoryList');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            try {
+                // Clear previous list
+                directoryList.innerHTML = '';
+                
+                // Get the directories
+                const response = await fetch(`/list-directories?path=${encodeURIComponent(pathInput.value)}`);
+                const directories = await response.json();
+                
+                if (directories.error) {
+                    directoryList.innerHTML = `<p style="color: red;">${directories.error}</p>`;
+                    return;
+                }
+
+                basePath = pathInput.value;
+                // Create checkboxes for each directory
+                directories.forEach(dir => {
+                    const div = document.createElement('div');
+                    div.className = 'directory-item';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = dir;
+                    checkbox.onchange = updateSelectedCount;
+                    
+                    const label = document.createElement('label');
+                    label.textContent = dir;
+                    
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = 'status-message';
+                    statusDiv.id = `status-${dir}`;
+                    
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+                    div.appendChild(statusDiv);
+                    directoryList.appendChild(div);
+                });
+
+                updateSelectedCount();
+                document.getElementById('updateAllBtn').style.display = 'block';
+            } catch (error) {
+                directoryList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function updateSelectedCount() {
+            const selectedDirs = document.querySelectorAll('#directoryList input[type="checkbox"]:checked');
+            const selectedCount = document.getElementById('selectedCount');
+            const count = selectedDirs.length;
+            selectedCount.textContent = `Selected directories: ${count}`;
+            document.getElementById('updateAllBtn').style.display = count > 0 ? 'block' : 'none';
+        }
+
+        async function updateDirectory(dirName) {
+            const statusDiv = document.getElementById(`status-${dirName}`);
+            const fullPath = `${basePath}/${dirName}`;
+            
+            try {
+                statusDiv.textContent = 'Updating...';
+                statusDiv.className = 'status-message';
+                
+                const response = await fetch('/update-docker', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: fullPath })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.textContent = 'Update successful';
+                    statusDiv.className = 'status-message success';
+                } else {
+                    statusDiv.textContent = `Error: ${result.error}`;
+                    statusDiv.className = 'status-message error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'status-message error';
+            }
+        }
+
+        async function updateSelectedDirectories() {
+            const selectedDirs = Array.from(document.querySelectorAll('#directoryList input[type="checkbox"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            document.getElementById('updateAllBtn').disabled = true;
+            
+            for (const dir of selectedDirs) {
+                await updateDirectory(dir);
+            }
+            
+            document.getElementById('updateAllBtn').disabled = false;
+        }
+    </script>
+</body>
+</html>
