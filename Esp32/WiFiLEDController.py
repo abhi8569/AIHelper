@@ -4,8 +4,8 @@ import machine
 import esp32
 
 # WiFi credentials
-SSID = "MikroTik-2GHz"
-PASSWORD = "5BNX9PA73S"
+SSID = "---------------"
+PASSWORD = "------------"
 
 # Static IP configuration
 STATIC_IP = "192.168.88.225"  # Replace with your desired static IP
